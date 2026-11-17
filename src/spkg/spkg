@@ -1,0 +1,123 @@
+#!/bin/sh
+# spkg - source-based package manager for clawrza-glibc-selfhost
+# Runs INSIDE the guest. Builds packages from source using the guest toolchain.
+# Database: /var/lib/spkg/installed/<name>/{PKGINFO,files.list,version}
+set -eu
+
+DB=/var/lib/spkg
+SRCROOT=/usr/src/packages
+
+usage() {
+    cat <<EOF
+spkg - source package manager
+usage: spkg <command> [args]
+  init                initialise package database
+  list                list installed packages
+  info <name>         show package metadata
+  build <name>        build+install a source package from $SRCROOT
+  files <name>        list files owned by a package
+  remove <name>       remove an installed package
+EOF
+    exit 0
+}
+
+init_db() {
+    mkdir -p "$DB/installed" "$DB/staging"
+    [ -f "$DB/world" ] || : > "$DB/world"
+    echo "spkg: database initialised at $DB"
+}
+
+find_pkg_src() {
+    name=$1
+    for d in "$SRCROOT/$name"-* "$SRCROOT/$name"; do
+        [ -f "$d/PKGINFO" ] || continue
+        echo "$d"
+        return 0
+    done
+    echo "spkg: no source package named '$name' in $SRCROOT" >&2
+    return 1
+}
+
+read_pkginfo() { # key file
+    sed -n "s/^$1=//p" "$2" | head -1
+}
+
+cmd_build() {
+    [ $# -eq 1 ] || { echo "usage: spkg build <name>" >&2; exit 2; }
+    name=$1
+    srcdir=$(find_pkg_src "$name")
+    dbdir="$DB/installed/$name"
+    mkdir -p "$DB/staging/$name"
+    destdir="$DB/staging/$name/dest"
+    rm -rf "$destdir"; mkdir -p "$destdir"
+
+    echo "spkg: building $name from $srcdir"
+    ( cd "$srcdir" && ./build.sh "$destdir" )
+
+    # record metadata and file list
+    mkdir -p "$dbdir"
+    cp "$srcdir/PKGINFO" "$dbdir/PKGINFO"
+    ver=$(read_pkginfo version "$srcdir/PKGINFO")
+    echo "$ver" > "$dbdir/version"
+    ( cd "$destdir" && find . -type f -o -type l ) | sed 's|^\./|/|' | LC_ALL=C sort > "$dbdir/files.list"
+
+    # deploy into the rootfs
+    ( cd "$destdir" && cp -a . / )
+
+    grep -qx "$name" "$DB/world" || echo "$name" >> "$DB/world"
+    echo "spkg: installed $name-$ver ($(wc -l < "$dbdir/files.list") files)"
+    rm -rf "$DB/staging/$name"
+}
+
+cmd_list() {
+    [ -d "$DB/installed" ] || { echo "spkg: database not initialised"; exit 1; }
+    for d in "$DB/installed"/*; do
+        [ -f "$d/PKGINFO" ] || continue
+        n=$(read_pkginfo name "$d/PKGINFO")
+        v=$(read_pkginfo version "$d/PKGINFO")
+        s=$(read_pkginfo summary "$d/PKGINFO")
+        printf '%-16s %-10s %s\n' "$n" "$v" "$s"
+    done
+}
+
+cmd_info() {
+    [ $# -eq 1 ] || { echo "usage: spkg info <name>" >&2; exit 2; }
+    f="$DB/installed/$1/PKGINFO"
+    [ -f "$f" ] || { echo "spkg: '$1' is not installed" >&2; exit 1; }
+    cat "$f"
+}
+
+cmd_files() {
+    [ $# -eq 1 ] || { echo "usage: spkg files <name>" >&2; exit 2; }
+    f="$DB/installed/$1/files.list"
+    [ -f "$f" ] || { echo "spkg: '$1' is not installed" >&2; exit 1; }
+    cat "$f"
+}
+
+cmd_remove() {
+    [ $# -eq 1 ] || { echo "usage: spkg remove <name>" >&2; exit 2; }
+    name=$1
+    d="$DB/installed/$name"
+    [ -f "$d/files.list" ] || { echo "spkg: '$name' is not installed" >&2; exit 1; }
+    tac "$d/files.list" | while read -r f; do
+        [ -n "$f" ] || continue
+        [ -L "$f" ] || [ -f "$f" ] && rm -f -- "$f"
+    done
+    grep -vx "$name" "$DB/world" > "$DB/world.new" || true
+    mv "$DB/world.new" "$DB/world"
+    rm -rf "$d"
+    echo "spkg: removed $name"
+}
+
+[ $# -gt 0 ] || usage
+cmd=$1; shift
+case "$cmd" in
+    init)    init_db ;;
+    list)    cmd_list ;;
+    info)    cmd_info "$@" ;;
+    build)   cmd_build "$@" ;;
+    files)   cmd_files "$@" ;;
+    remove)  cmd_remove "$@" ;;
+    -h|--help|help) usage ;;
+    *) echo "spkg: unknown command '$cmd'" >&2; exit 2 ;;
+esac

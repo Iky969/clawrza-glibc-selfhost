@@ -1,0 +1,5 @@
+hello 1.0
+==========
+
+Demonstration source package for clawrza-glibc-selfhost.
+Built entirely inside the guest with the guest's gcc and make.
