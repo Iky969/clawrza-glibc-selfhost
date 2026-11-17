@@ -13,6 +13,10 @@ install -m 0644 "$ROOT/configs/passwd"    "$SYSROOT/etc/passwd"
 install -m 0644 "$ROOT/configs/group"     "$SYSROOT/etc/group"
 install -m 0644 "$ROOT/configs/init.conf" "$SYSROOT/etc/init.conf"
 
+install -d -m 0755 "$SYSROOT/usr/share/udhcpc"
+install -m 0755 "$ROOT/configs/udhcpc-default.script" \
+    "$SYSROOT/usr/share/udhcpc/default.script"
+
 cat > "$SYSROOT/etc/profile" <<'EOF'
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 export HOME=/root

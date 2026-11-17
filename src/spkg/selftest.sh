@@ -7,6 +7,19 @@ echo "SELFTEST: PID1_CMD=$(tr '\0' ' ' < /proc/1/cmdline)"
 echo "SELFTEST: ps output:"
 ps | head -8
 
+# wait for the udhcpc service started from /etc/init.conf
+n=0
+while ! ip addr show eth0 2>/dev/null | grep -q 'inet ' && [ "$n" -lt 20 ]; do
+    sleep 0.5
+    n=$((n + 1))
+done
+echo "SELFTEST: network -> $(ip addr show eth0 2>/dev/null | grep 'inet ' | head -1)"
+if ping -c 2 -W 2 10.0.2.2 >/dev/null 2>&1; then
+    echo "SELFTEST: outbound ping OK"
+else
+    echo "SELFTEST: outbound ping FAILED"
+fi
+
 echo "SELFTEST: gcc version -> $(gcc --version | head -1)"
 mkdir -p /tmp/selfhost-test
 cat > /tmp/selfhost-test/hello.c <<'EOF'
