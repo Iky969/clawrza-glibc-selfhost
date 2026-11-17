@@ -54,11 +54,12 @@ make install DESTDIR="$SYSROOT" >> "$BUILD/toolchain-$STAGE.log" 2>&1 || {
 # ---------------------------------------------------------------- 4. gcc
 STAGE=gcc
 rm -rf "$BUILD/gcc-build"; mkdir -p "$BUILD/gcc-build"; cd "$BUILD/gcc-build"
-log "configuring gcc $GCC_VER (C and C++)"
+log "configuring gcc $GCC_VER (C only, faster bootstrap)"
 "$SRCDIR/gcc-${GCC_VER}/configure" \
     --prefix=/usr --build="$TARGET" --host="$TARGET" --target="$TARGET" \
-    --enable-languages=c,c++ \
+    --enable-languages=c \
     --disable-nls --disable-werror --disable-multilib --disable-bootstrap \
+    --disable-libssp --disable-libgomp --disable-libquadmath \
     --with-system-zlib \
     --with-native-system-header-dir=/usr/include \
     --with-build-sysroot="$SYSROOT" \
