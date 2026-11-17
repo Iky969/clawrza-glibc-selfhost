@@ -65,6 +65,18 @@ cat > "$SYSROOT/etc/ld.so.conf" <<'EOF'
 /lib64
 /usr/lib
 EOF
+# source for in-guest rebuild proof (kinit is C, spkg is a POSIX sh script)
+install -d -m 0755 "$SYSROOT/usr/src/clawrza"
+install -m 0644 "$ROOT/src/init/kinit.c" "$SYSROOT/usr/src/clawrza/kinit.c"
+install -m 0644 "$ROOT/src/spkg/spkg"   "$SYSROOT/usr/src/clawrza/spkg.sh"
+install -m 0644 "$ROOT/src/rebuild/Makefile" "$SYSROOT/usr/src/clawrza/Makefile"
+
+# busybox install drops a /sbin/init symlink; our PID 1 must win, always.
+if [ -f "$BUILD/kinit" ]; then
+    install -m 0755 "$BUILD/kinit" "$SYSROOT/sbin/init"
+    install -m 0755 "$BUILD/kinit" "$SYSROOT/sbin/kinit"
+fi
+
 log "host shared libraries copied for guest toolchain; /lib symlinks created"
 
 # sample source package, present inside the guest

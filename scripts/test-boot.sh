@@ -48,6 +48,8 @@ check "gcc compiled C in guest"  "SELFHOST_OK"
 check "make build"               "SELFTEST: make build OK"
 check "spkg built from source"   "SELFTEST: spkg build OK"
 check "selftest completed"       "SELFTEST: done"
+check "kinit rebuilt in guest"   "SELFTEST: in-guest make rebuild OK"
+check "spkg source runnable"     "SELFTEST: rebuilt spkg source runs OK"
 
 if grep -qi 'Kernel panic\|Attempted to kill init' "$LOG" 2>/dev/null; then
     echo "[FAIL] kernel panic detected"

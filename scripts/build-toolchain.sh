@@ -92,7 +92,7 @@ make defconfig > "$BUILD/toolchain-$STAGE.log" 2>&1
 for opt in CONFIG_CTTYHACK CONFIG_ASH CONFIG_SH_MATH_SUPPORT CONFIG_UNXZ \
            CONFIG_GZIP CONFIG_FEATURE_SEAMLESS_GZ CONFIG_NSLOOKUP \
            CONFIG_PING CONFIG_IFCONFIG CONFIG_UDHCPC CONFIG_SWITCH_ROOT \
-           CONFIG_MOUNT CONFIG_FEATURE_MOUNT_FAKE; do
+           CONFIG_MOUNT CONFIG_FEATURE_MOUNT_FAKE CONFIG_SHA256SUM; do
     sed -i "s/^# ${opt} is not set/${opt}=y/" .config
     grep -q "^${opt}=y" .config || echo "${opt}=y" >> .config
 done

@@ -46,6 +46,25 @@ if spkg build hello; then
 else
     echo "SELFTEST: spkg build FAILED"
 fi
+
+# --- prove self-hosting of the distro's own init and package manager -------
+echo "SELFTEST: rebuilding kinit + spkg from source INSIDE guest"
+cd /usr/src/clawrza
+make clean >/dev/null 2>&1 || true
+if make; then
+    echo "SELFTEST: in-guest make rebuild OK"
+else
+    echo "SELFTEST: in-guest make rebuild FAILED"
+fi
+echo "SELFTEST: rebuilt kinit sha256 -> $(sha256sum kinit | cut -d' ' -f1)"
+echo "SELFTEST: installed kinit sha256 -> $(sha256sum /sbin/init | cut -d' ' -f1)"
+echo "SELFTEST: rebuilt kinit refuses non-PID1 -> $(./kinit 2>&1 | head -1)"
+if ./spkg list >/dev/null 2>&1; then
+    echo "SELFTEST: rebuilt spkg source runs OK"
+else
+    echo "SELFTEST: rebuilt spkg source FAILED"
+fi
+
 echo "SELFTEST: installed packages:"
 spkg list || true
 
