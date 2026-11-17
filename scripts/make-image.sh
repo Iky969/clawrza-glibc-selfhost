@@ -4,7 +4,8 @@ set -euo pipefail
 
 IMG="$DISTRO/clawrza.img"
 LIMINE=$(find "$SRCDIR" -maxdepth 1 -type d -name 'limine-*' | head -1)
-[ -n "$LIMINE" ] || die "limine source not fetched"
+LIMINE_BIN="$SRCDIR/limine-binary/limine-binary"
+[ -x "$LIMINE_BIN/limine-deploy" ] || die "limine prebuilt binaries not fetched"
 need qemu-img
 need sgdisk
 need sudo
@@ -40,23 +41,18 @@ sudo install -m 0644 "$DISTRO/bzImage"          "$BUILD/mnt/boot/bzImage"
 sudo install -m 0644 "$DISTRO/initramfs.cpio.gz" "$BUILD/mnt/boot/initramfs.cpio.gz"
 sudo install -m 0644 "$ROOT/configs/limine.cfg"  "$BUILD/mnt/boot/limine.cfg"
 sudo mkdir -p "$BUILD/mnt/boot/EFI/BOOT"
-if [ -f "$LIMINE/limine-bios.sys" ]; then
-    sudo install -m 0644 "$LIMINE/limine-bios.sys" "$BUILD/mnt/boot/limine-bios.sys"
+if [ -f "$LIMINE_BIN/limine-bios.sys" ]; then
+    sudo install -m 0644 "$LIMINE_BIN/limine-bios.sys" "$BUILD/mnt/boot/limine-bios.sys"
 fi
 for f in BOOTX64.EFI BOOTIA32.EFI; do
-    p=$(find "$LIMINE" -name "$f" | head -1)
+    p=$(find "$LIMINE_BIN" -name "$f" | head -1)
     [ -n "$p" ] && sudo install -m 0644 "$p" "$BUILD/mnt/boot/EFI/BOOT/$f"
 done
 sudo cp "$ROOT/configs/limine.cfg" "$BUILD/mnt/boot/EFI/BOOT/limine.cfg" 2>/dev/null || true
 sudo umount "$BUILD/mnt/boot"
 
-log "installing Limine to MBR + BIOS boot partition"
-if [ -x "$LIMINE/limine-deploy" ]; then
-    sudo "$LIMINE/limine-deploy" --force-mbr "$LOOP" || \
-    sudo "$LIMINE/limine-deploy" "$LOOP" || \
-    echo "WARNING: limine-deploy failed; BIOS boot may not work"
-else
-    echo "WARNING: limine-deploy binary not found"
-fi
+log "installing Limine to BIOS boot partition (GPT index 3)"
+sudo "$LIMINE_BIN/limine-deploy" bios-install --force --quiet "$LOOP" 3 || \
+echo "WARNING: limine bios-install failed; BIOS boot may not work"
 sync
 log "image ready: $(ls -lh "$IMG" | awk '{print $5}')  $IMG"
