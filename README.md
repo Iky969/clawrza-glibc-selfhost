@@ -96,3 +96,46 @@ SELFTEST: spkg build OK
 ```
 
 `make test` fails if any marker is missing or a kernel panic appears.
+
+## Verified result (2026-11-17, `make test` exit 0)
+
+```
+=== kinit start (PID 1) v0.1 ===
+SELFTEST: uname -> Linux clawrza 6.12.74 #1 SMP PREEMPT_DYNAMIC ... x86_64 GNU/Linux
+SELFTEST: PID1_CMD=/sbin/init
+PID   USER     TIME  COMMAND
+    1 root      0:01 /sbin/init
+    2 root      0:00 [kthreadd]
+SELFTEST: gcc version -> gcc (GCC) 14.2.0
+SELFHOST_OK: compiled inside guest
+SELFTEST: gcc compile OK
+SELFTEST: make build OK
+SELFTEST: spkg build OK
+=== SELFTEST: done ===
+[PASS] kernel booted
+[PASS] kinit is PID 1
+[PASS] uname -a reported
+[PASS] ps shows PID 1
+[PASS] gcc compiled C in guest
+[PASS] make build
+[PASS] spkg built from source
+[PASS] selftest completed
+```
+
+Artifacts: `bzImage` 11 M, `initramfs.cpio.gz` 2,9 M, `clawrza.img` 512 M.
+
+### Boot-time environment contract
+
+`kinit` exports two variables before forking any service; both are required
+because this sysroot is assembled without an `ld.so.cache` and gcc was built
+with a build-sysroot:
+
+- `LD_LIBRARY_PATH=/lib64:/lib:/usr/lib` — lets `cc1`, `as`, `ld` resolve
+  `libisl`, `libmpc`, `libmpfr`, `libgmp`, `libbfd`.
+- `GCC_EXEC_PREFIX=/usr/lib/gcc/` — makes gcc resolve its internal headers
+  (`stddef.h`) and `libgcc` with absolute paths instead of the relative
+  `-iprefix ../lib/gcc/...` baked in at build time.
+
+`/usr/bin/cc1` is a **relative** symlink to
+`../libexec/gcc/x86_64-linux-gnu/14.2.0/cc1` (a host-absolute link breaks
+inside the guest).

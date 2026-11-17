@@ -98,6 +98,10 @@ int main(void) {
     setup_fs();
     sethostname("clawrza", 7);
 
+    /* this sysroot has no ld.so.cache: point the loader at all lib dirs */
+    setenv("LD_LIBRARY_PATH", "/lib64:/lib:/usr/lib", 1);
+    setenv("GCC_EXEC_PREFIX", "/usr/lib/gcc/", 1);
+
     printf("\n=== kinit start (PID 1) v0.1 ===\n");
     printf("kinit: hostname=clawrza\n");
     printf("kinit: mounting filesystems done\n");

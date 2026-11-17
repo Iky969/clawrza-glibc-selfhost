@@ -21,6 +21,51 @@ EOF
 
 install -m 0755 "$ROOT/src/spkg/spkg"      "$SYSROOT/usr/bin/spkg"
 install -m 0755 "$ROOT/src/spkg/selftest.sh" "$SYSROOT/usr/bin/selftest"
+ln -sf gcc "$SYSROOT/usr/bin/cc"
+# gcc invokes cc1 by bare name; make it discoverable on PATH inside the guest.
+# The symlink MUST be relative: a host absolute path would be broken in QEMU.
+CC1=$(find "$SYSROOT/usr/libexec" -name cc1 -type f 2>/dev/null | head -1)
+if [ -n "$CC1" ]; then
+    GVER=$(basename "$(dirname "$CC1")")
+    ln -sfn "../libexec/gcc/$TARGET/$GVER/cc1" "$SYSROOT/usr/bin/cc1"
+fi
+
+# The host-built gcc/cc1/as/ld are linked against host shared libraries
+# (libisl, libmpc, libmpfr, libgmp, zlib, zstd). Copy those into the guest so
+# the toolchain is actually runnable inside QEMU. Never overwrite our libc.
+copy_host_deps() {
+    local bin="$1" lib b
+    [ -f "$bin" ] || return 0
+    ldd "$bin" 2>/dev/null | sed -n 's/.*=> \(\/[^ ]*\).*/\1/p' | while read -r lib; do
+        b=$(basename "$lib")
+        case "$b" in
+            libc.so.6|libm.so.6|libdl.so.2|libpthread.so.0|ld-linux*) continue ;;
+        esac
+        if [ ! -e "$SYSROOT/usr/lib/$b" ] && [ ! -e "$SYSROOT/lib64/$b" ]; then
+            install -D -m 0644 "$lib" "$SYSROOT/usr/lib/$b"
+        fi
+    done
+}
+for b in usr/bin/gcc usr/bin/cc1 usr/bin/as usr/bin/ld usr/bin/make bin/busybox; do
+    copy_host_deps "$SYSROOT/$b"
+done
+CC1=$(find "$SYSROOT/usr/libexec" -name cc1 -type f 2>/dev/null | head -1)
+[ -n "$CC1" ] && copy_host_deps "$CC1"
+
+# glibc's loader in this sysroot searches /lib and /lib64 but not /usr/lib
+# unless an ld.so.cache exists. Mirror the shared objects into /lib so the
+# toolchain (cc1, as, ld) can resolve them without a cache.
+install -d -m 0755 "$SYSROOT/lib"
+for so in "$SYSROOT"/usr/lib/*.so*; do
+    [ -e "$so" ] || continue
+    ln -sfn "../usr/lib/$(basename "$so")" "$SYSROOT/lib/$(basename "$so")"
+done
+cat > "$SYSROOT/etc/ld.so.conf" <<'EOF'
+/lib
+/lib64
+/usr/lib
+EOF
+log "host shared libraries copied for guest toolchain; /lib symlinks created"
 
 # sample source package, present inside the guest
 install -d -m 0755 "$SYSROOT/usr/src/packages"
