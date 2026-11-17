@@ -96,6 +96,9 @@ for opt in CONFIG_CTTYHACK CONFIG_ASH CONFIG_SH_MATH_SUPPORT CONFIG_UNXZ \
     sed -i "s/^# ${opt} is not set/${opt}=y/" .config
     grep -q "^${opt}=y" .config || echo "${opt}=y" >> .config
 done
+# kernel 6.x headers removed CBQ definitions; the tc applet no longer builds
+sed -i 's/^CONFIG_TC=y$/# CONFIG_TC is not set/' .config
+grep -q '^# CONFIG_TC is not set$' .config || echo '# CONFIG_TC is not set' >> .config
 make oldconfig >> "$BUILD/toolchain-$STAGE.log" 2>&1 || true
 log "building busybox (make -j$JOBS)"
 make -j"$JOBS" >> "$BUILD/toolchain-$STAGE.log" 2>&1 || {
